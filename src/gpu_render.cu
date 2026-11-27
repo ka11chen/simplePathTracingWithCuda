@@ -1270,10 +1270,12 @@ void gpuInitDevice(void) {
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 8192));
 }
 
+// copy data to gpu and flatten them
 GpuRenderSession *gpuCreateSession(VirtualScreen *vs, Object **objects, LightSource **sources,
                                    Camera *camera, int maxDepth, uint32_t seed) {
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 8192));
-    GpuRenderSession *sess = new GpuRenderSession{};
+    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 8192)); // we raise the limit of stack size since SSS might need that
+    GpuRenderSession *sess = new GpuRenderSession{};          // init the flattened memory in RAM
+    // set the corresponding value
     sess->vs = vs;
     sess->width = getScreenWidth(vs);
     sess->height = getScreenHeight(vs);
@@ -1281,9 +1283,11 @@ GpuRenderSession *gpuCreateSession(VirtualScreen *vs, Object **objects, LightSou
     sess->maxDepth = maxDepth;
     sess->seed = seed;
     sess->totalSamplesLaunched = 0;
+    // upload to GPU and flatten them
     sess->scene = gpuUploadScene(objects, sources, camera);
     CUDA_CHECK(cudaMemcpyToSymbol(g_scene, &sess->scene->view, sizeof(GpuSceneView)));
 
+    // allocate memory for GPU
     size_t np = (size_t)sess->numPixels;
     CUDA_CHECK(cudaMalloc(&sess->d_accumX, np * sizeof(double)));
     CUDA_CHECK(cudaMalloc(&sess->d_accumY, np * sizeof(double)));

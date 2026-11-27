@@ -1,5 +1,6 @@
 # Blender 4.5.11 LTS
 # www.blender.org
+# convert from https://sketchfab.com/3d-models/apple-logo-dc39f733d8d84f5c86e4b6c1270e9c50
 mtllib apple.mtl
 o BezierCircle
 v -1.948165 0.172049 0.000000

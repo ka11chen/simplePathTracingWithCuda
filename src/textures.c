@@ -130,35 +130,42 @@ Vector sampleRayleighScatteringNextDirection(Vector input, MT19937 *mt) {
     return toWorld(local, input);
 }
 
-#define AG_LINE_COUNT 446
-static Complex AgEta[AG_LINE_COUNT];
-static const char AG_PATH_N[] = "src/static/ag_n.csv";
-static const char AG_PATH_K[] = "src/static/ag_k.csv";
-static const Real AG_LAMBDA_STEP = 1;
+typedef struct {
+    Complex *eta;
+    int n;
+    const char *pathN;
+    const char *pathK;
+    const Real lambdaStep;
+} RefIndex;
 
-#define AU_LINE_COUNT 46
-static Complex AuEta[AU_LINE_COUNT];
-static const char AU_PATH_N[] = "src/static/au_n.csv";
-static const char AU_PATH_K[] = "src/static/au_k.csv";
-static const Real AU_LAMBDA_STEP = 10;
+static RefIndex Ag = {
+    .pathN = "src/static/ag_n.csv",
+    .pathK = "src/static/ag_k.csv",
+    .lambdaStep = 1
+};
 
-#define CU_LINE_COUNT 46
-static Complex CuEta[CU_LINE_COUNT];
-static const char CU_PATH_N[] = "src/static/cu_n.csv";
-static const char CU_PATH_K[] = "src/static/cu_k.csv";
-static const Real CU_LAMBDA_STEP = 10;
+static RefIndex Au = {
+    .pathN = "src/static/au_n.csv",
+    .pathK = "src/static/au_k.csv",
+    .lambdaStep = 10
+};
 
-#define FE_LINE_COUNT 46
-static Complex FeEta[FE_LINE_COUNT];
-static const char FE_PATH_N[] = "src/static/fe_n.csv";
-static const char FE_PATH_K[] = "src/static/fe_k.csv";
-static const Real FE_LAMBDA_STEP = 10;
+static RefIndex Cu = {
+    .pathN = "src/static/cu_n.csv",
+    .pathK = "src/static/cu_k.csv",
+    .lambdaStep = 10
+};
 
-#define GLASS_LINE_COUNT 45
-static Complex GlassEta[GLASS_LINE_COUNT];
-static const char GLASS_PATH_N[] = "src/static/glass_n.csv";
-static const char GLASS_PATH_K[] = "src/static/glass_k.csv";
-static const Real GLASS_LAMBDA_STEP = 10;
+static RefIndex Fe = {
+    .pathN = "src/static/fe_n.csv",
+    .pathK = "src/static/fe_k.csv",
+    .lambdaStep = 10
+};
+static RefIndex Glass = {
+    .pathN = "src/static/glass_n.csv",
+    .pathK = "src/static/glass_k.csv",
+    .lambdaStep = 10
+};
 
 static const Real startLambda = 390;
 
@@ -168,46 +175,68 @@ static void dataFileError(const char *path, const char *reason) {
     exit(1);
 }
 
-static FILE *openDataFile(const char *path, int expectedLines) {
+static FILE *openDataFile(const char *path, int *lineCount) {
     FILE *f = fopen(path, "r");
     if (f == NULL) dataFileError(path, "cannot open file");
-    int lineCountFromFile = 0;
-    if (fscanf(f, "%d", &lineCountFromFile) != 1) dataFileError(path, "missing line count");
-    if (lineCountFromFile < expectedLines) dataFileError(path, "fewer lines than expected");
+    if (fscanf(f, "%d", lineCount) != 1) dataFileError(path, "missing line count");
     return f;
 }
 
-static void readFile(const char *filePathN, const char *filePathK, Complex eta[], int lineCount) {
-    FILE *fN = openDataFile(filePathN, lineCount);
+static void readFile(RefIndex *src) {
+    if (src->eta != NULL) return;
+
+    int lineCount;
+    FILE *fN = openDataFile(src->pathN, &lineCount);
+    src->n = lineCount;
+    src->eta = malloc(lineCount * sizeof(*src->eta));
+    if (src->eta == NULL) {
+        mallocFailed();
+    }
+
     for (int i = 0; i < lineCount; i++) {
         Real lambda = 0;
-        if (fscanf(fN, REAL_FMT "," REAL_FMT, &lambda, &eta[i].R) != 2)
-            dataFileError(filePathN, "malformed line");
+        if (fscanf(fN, REAL_FMT "," REAL_FMT, &lambda, &src->eta[i].R) != 2)
+            dataFileError(src->pathN, "malformed line");
     }
     fclose(fN);
 
-    FILE *fK = openDataFile(filePathK, lineCount);
+    int lineCountK;
+    FILE *fK = openDataFile(src->pathK, &lineCountK);
+    if (lineCount != lineCountK) {
+        fprintf(stderr, "Files %s and %s have unmatched line counts", src->pathN, src->pathK);
+        exit(1);
+    }
+
     for (int i = 0; i < lineCount; i++) {
         Real lambda = 0;
-        if (fscanf(fK, REAL_FMT "," REAL_FMT, &lambda, &eta[i].I) != 2)
-            dataFileError(filePathK, "malformed line");
+        if (fscanf(fK, REAL_FMT "," REAL_FMT, &lambda, &src->eta[i].I) != 2) {
+            dataFileError(src->pathK, "malformed line");
+        }
     }
     fclose(fK);
     return;
 }
 
-#define SAPPHIRE_LINE_COUNT 46
 // let real part of EC be E perp C and the imaginary part be E para C since I want to reuse the code
 // of "getRefractivity" function
-static Complex EC[SAPPHIRE_LINE_COUNT];
+static Complex *EC;
+static int SAPPHIRE_LINE_COUNT;
 static const char SAPPHIRE_PATH[] = "src/static/sapphire_epsilon.csv";
 static const Real SAPPHIRE_STEP = 10;
 
 // since no direct k can be directly used by sapphire, we need a different way to read the epsilon
 static void readSapphireEpsilon() {
-    FILE *f = openDataFile(SAPPHIRE_PATH, SAPPHIRE_LINE_COUNT);
+    if (EC != NULL) return;
 
-    for (int i = 0; i < SAPPHIRE_LINE_COUNT; i++) {
+    int lineCount = 0;
+    FILE *f = openDataFile(SAPPHIRE_PATH, &lineCount);
+    SAPPHIRE_LINE_COUNT = lineCount;
+    EC = malloc(lineCount * sizeof(*EC));
+    if (EC == NULL) {
+        mallocFailed();
+    }
+
+    for (int i = 0; i < lineCount; i++) {
         Real lambda;
         if (fscanf(f, REAL_FMT "," REAL_FMT "," REAL_FMT, &lambda, &EC[i].R, &EC[i].I) != 3)
             dataFileError(SAPPHIRE_PATH, "malformed line");
@@ -218,11 +247,11 @@ static void readSapphireEpsilon() {
 }
 
 void initTexture() {
-    readFile(AG_PATH_N, AG_PATH_K, AgEta, AG_LINE_COUNT);
-    readFile(AU_PATH_N, AU_PATH_K, AuEta, AU_LINE_COUNT);
-    readFile(CU_PATH_N, CU_PATH_K, CuEta, CU_LINE_COUNT);
-    readFile(FE_PATH_N, FE_PATH_K, FeEta, FE_LINE_COUNT);
-    readFile(GLASS_PATH_N, GLASS_PATH_K, GlassEta, GLASS_LINE_COUNT);
+    readFile(&Ag);
+    readFile(&Au);
+    readFile(&Cu);
+    readFile(&Fe);
+    readFile(&Glass);
     readSapphireEpsilon();
 }
 
@@ -320,23 +349,23 @@ Complex getRefractivity(Real lambda, Complex eta[], Real lambdaStep, int lineCou
 }
 
 Complex getSilverRefractivity(Texture *_, Real lambda) {
-    return getRefractivity(lambda, AgEta, AG_LAMBDA_STEP, AG_LINE_COUNT);
+    return getRefractivity(lambda, Ag.eta, Ag.lambdaStep, Ag.n);
 }
 
 Complex getGoldRefractivity(Texture *_, Real lambda) {
-    return getRefractivity(lambda, AuEta, AU_LAMBDA_STEP, AU_LINE_COUNT);
+    return getRefractivity(lambda, Au.eta, Au.lambdaStep, Au.n);
 }
 
 Complex getCopperRefractivity(Texture *_, Real lambda) {
-    return getRefractivity(lambda, CuEta, CU_LAMBDA_STEP, CU_LINE_COUNT);
+    return getRefractivity(lambda, Cu.eta, Cu.lambdaStep, Cu.n);
 }
 
 Complex getIronRefractivity(Texture *_, Real lambda) {
-    return getRefractivity(lambda, FeEta, FE_LAMBDA_STEP, FE_LINE_COUNT);
+    return getRefractivity(lambda, Fe.eta, Fe.lambdaStep, Fe.n);
 }
 
 Complex getGlassRefractivity(Texture *_, Real lambda) {
-    return getRefractivity(lambda, GlassEta, GLASS_LAMBDA_STEP, GLASS_LINE_COUNT);
+    return getRefractivity(lambda, Glass.eta, Glass.lambdaStep, Glass.n);
 }
 
 Complex getDiamondRefractivity(Texture *_, Real x) {

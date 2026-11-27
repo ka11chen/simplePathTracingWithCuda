@@ -215,18 +215,24 @@ static void readFile(RefIndex *src) {
     return;
 }
 
-#define SAPPHIRE_LINE_COUNT 46
 // let real part of EC be E perp C and the imaginary part be E para C since I want to reuse the code
 // of "getRefractivity" function
-static Complex EC[SAPPHIRE_LINE_COUNT];
+static Complex *EC;
+static int SAPPHIRE_LINE_COUNT;
 static const char SAPPHIRE_PATH[] = "src/static/sapphire_epsilon.csv";
 static const Real SAPPHIRE_STEP = 10;
 
 // since no direct k can be directly used by sapphire, we need a different way to read the epsilon
 static void readSapphireEpsilon() {
-    FILE *f = openDataFile(SAPPHIRE_PATH, SAPPHIRE_LINE_COUNT);
+    int lineCount = 0;
+    FILE *f = openDataFile(SAPPHIRE_PATH, &lineCount);
+    SAPPHIRE_LINE_COUNT = lineCount;
+    EC = malloc(lineCount * sizeof(*EC));
+    if (EC == NULL) {
+        mallocFailed();
+    }
 
-    for (int i = 0; i < SAPPHIRE_LINE_COUNT; i++) {
+    for (int i = 0; i < lineCount; i++) {
         Real lambda;
         if (fscanf(f, REAL_FMT "," REAL_FMT "," REAL_FMT, &lambda, &EC[i].R, &EC[i].I) != 3)
             dataFileError(SAPPHIRE_PATH, "malformed line");

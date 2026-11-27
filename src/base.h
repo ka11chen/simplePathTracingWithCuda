@@ -137,7 +137,7 @@ static const Real error = 1e-3;
 
 static inline Real lengthOf(Vector v) { return rsqrt_(v.x * v.x + v.y * v.y + v.z * v.z); }
 
-static inline Real length2Of(Vector v) { return v.x * v.x + v.y + v.y + v.z * v.z; }
+static inline Real length2Of(Vector v) { return v.x * v.x + v.y * v.y + v.z * v.z; }
 
 // normalize the vector
 static inline Vector unitVector(Vector vec) {

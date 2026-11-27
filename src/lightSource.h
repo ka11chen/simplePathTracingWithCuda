@@ -39,7 +39,7 @@ static inline ColorXYZ colorComponent(Real c, ColorXYZ color) {
 
 CollideLightSourceResult collideLightSource(LightSource *source, ReversedRay *ray);
 
-Real getBlackbodyIntensity(Real T, Real wavelength);
+Real getBlackbodyIntensity(Real wavelength, Real T);
 
 Real tungstenLampBase(Real wavelength);
 

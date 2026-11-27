@@ -36,9 +36,12 @@ void initLightIntensity() {
 
     for (int i = 0; i < 89; i++) {
         int lambda;
-        fscanf(csv, "%d,", &lambda);
-        fscanf(csv, REAL_FMT "," REAL_FMT "," REAL_FMT, &convertTable[i].X, &convertTable[i].Y,
-               &convertTable[i].Z);
+        if (fscanf(csv, "%d,", &lambda) != 1 ||
+            fscanf(csv, REAL_FMT "," REAL_FMT "," REAL_FMT, &convertTable[i].X, &convertTable[i].Y,
+                   &convertTable[i].Z) != 3) {
+            fprintf(stderr, "Failed to read src/static/wavelengthToXYZ.csv: malformed line\n");
+            exit(1);
+        }
     }
     fclose(csv);
 }

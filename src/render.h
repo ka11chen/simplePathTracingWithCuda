@@ -10,6 +10,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct VirtualScreen VirtualScreen;
 
 VirtualScreen *newScreen(int width, int height);
@@ -39,5 +43,9 @@ void destroyScreen(VirtualScreen *screen);
 
 void renderPixel(Camera *camera, VirtualScreen *s, int x, int y, Object **objects,
                  LightSource **sources, MT19937 *mt, int maxDepth);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

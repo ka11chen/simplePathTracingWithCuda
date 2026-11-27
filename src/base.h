@@ -6,6 +6,12 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#ifdef __cplusplus
+#define PT_MAKE(T, ...) T{__VA_ARGS__}
+#else
+#define PT_MAKE(T, ...) ((T){__VA_ARGS__})
+#endif
+
 #ifdef DOUBLE_AS_REAL
 #define REAL_FMT "%lf"
 typedef double Real;
@@ -78,6 +84,8 @@ static inline Real rsqrt_(Real x) {
 #endif
 }
 
+#ifndef __CUDACC__
+// CUDA's crt/math_functions.h defines rcbrt(double); device code uses g_cbrt instead.
 static inline Real rcbrt(Real x) {
 #ifdef DOUBLE_AS_REAL
     return cbrt(x);
@@ -85,6 +93,7 @@ static inline Real rcbrt(Real x) {
     return cbrtf(x);
 #endif
 }
+#endif
 
 typedef union {
     struct {
@@ -110,22 +119,24 @@ typedef Tuple Vector;
 typedef Tuple Point;
 
 static inline Vector vecCross(Vector a, Vector b) {
-    return (Vector){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
+    return PT_MAKE(Vector, a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
 }
 
 static inline Vector vecAdd(Vector a, Vector b) {
-    return (Vector){a.x + b.x, a.y + b.y, a.z + b.z};
+    return PT_MAKE(Vector, a.x + b.x, a.y + b.y, a.z + b.z);
 }
 
 static inline Vector vecMinus(Vector a, Vector b) {
-    return (Vector){a.x - b.x, a.y - b.y, a.z - b.z};
+    return PT_MAKE(Vector, a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
 // return -v
-static inline Vector vecNegative(Vector v) { return (Vector){-v.x, -v.y, -v.z}; }
+static inline Vector vecNegative(Vector v) { return PT_MAKE(Vector, -v.x, -v.y, -v.z); }
 
 // scaler multiplication of vectors
-static inline Vector vecMultiply(Real c, Vector a) { return (Vector){c * a.x, c * a.y, c * a.z}; }
+static inline Vector vecMultiply(Real c, Vector a) {
+    return PT_MAKE(Vector, c * a.x, c * a.y, c * a.z);
+}
 
 static inline Real vecDot(Vector a, Vector b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 
@@ -137,13 +148,13 @@ static const Real error = 1e-3;
 
 static inline Real lengthOf(Vector v) { return rsqrt_(v.x * v.x + v.y * v.y + v.z * v.z); }
 
-static inline Real length2Of(Vector v) { return v.x * v.x + v.y + v.y + v.z * v.z; }
+static inline Real length2Of(Vector v) { return v.x * v.x + v.y * v.y + v.z * v.z; }
 
 // normalize the vector
 static inline Vector unitVector(Vector vec) {
     Real length = lengthOf(vec);
-    if (length < error) return (Vector){0, 0, 0};
-    return (Vector){vec.x / length, vec.y / length, vec.z / length};
+    if (length < error) return PT_MAKE(Vector, 0, 0, 0);
+    return PT_MAKE(Vector, vec.x / length, vec.y / length, vec.z / length);
 }
 
 typedef struct {
@@ -153,7 +164,7 @@ typedef struct {
 } ReversedRay;
 
 static inline ReversedRay getRay(Point start, Vector direction, Real wavelength) {
-    return (ReversedRay){start, unitVector(direction), wavelength};
+    return PT_MAKE(ReversedRay, start, unitVector(direction), wavelength);
 }
 
 typedef Real LightIntensity;
@@ -162,22 +173,28 @@ typedef struct {
     Real R, I;
 } Complex;
 
-static inline Complex cplxAdd(Complex a, Complex b) { return (Complex){a.R + b.R, a.I + b.I}; }
+static inline Complex cplxAdd(Complex a, Complex b) {
+    return PT_MAKE(Complex, a.R + b.R, a.I + b.I);
+}
 
-static inline Complex cplxMinus(Complex a, Complex b) { return (Complex){a.R - b.R, a.I - b.I}; }
+static inline Complex cplxMinus(Complex a, Complex b) {
+    return PT_MAKE(Complex, a.R - b.R, a.I - b.I);
+}
 
 static inline Complex cplxMultiply(Complex a, Complex b) {
     // (a + bi)(c + di) = (ac - bd) + (ad + bc)i
-    return (Complex){a.R * b.R - a.I * b.I, a.R * b.I + a.I * b.R};
+    return PT_MAKE(Complex, a.R * b.R - a.I * b.I, a.R * b.I + a.I * b.R);
 }
 
-static inline Complex cplxMultiplyByReal(Real r, Complex z) { return (Complex){r * z.R, r * z.I}; }
+static inline Complex cplxMultiplyByReal(Real r, Complex z) {
+    return PT_MAKE(Complex, r * z.R, r * z.I);
+}
 
 static inline Complex cplxDivide(Complex a, Complex b) {
     // (a + bi) / (c + di) = (a + bi)(c - di) / (c^2 + d^2)
     // = (ac + bd) / (c^2 + d^2) + (bc - ad)i / (c^2 + d^2)
     Real deno = b.R * b.R + b.I * b.I;
-    return (Complex){(a.R * b.R + a.I * b.I) / deno, (a.I * b.R - a.R * b.I) / deno};
+    return PT_MAKE(Complex, (a.R * b.R + a.I * b.I) / deno, (a.I * b.R - a.R * b.I) / deno);
 }
 
 static inline Real cplxModulus(Complex z) { return rsqrt_(z.R * z.R + z.I * z.I); }
@@ -213,13 +230,13 @@ static inline Real lerpInterval(Real x1, Real x2, Real x, Real y1, Real y2) {
 }
 
 static inline Vector toWorld(Vector local, Vector N) {
-    Vector helper = (rabs(N.x) > 0.9) ? ((Vector){0, 1, 0}) : ((Vector){1, 0, 0});
+    Vector helper = (rabs(N.x) > 0.9) ? PT_MAKE(Vector, 0, 1, 0) : PT_MAKE(Vector, 1, 0, 0);
     Vector T = unitVector(vecCross(helper, N));
     Vector B = vecCross(N, T);
     // project the unturned to turned
-    Vector nxtDirection = (Vector){local.x * T.x + local.y * B.x + local.z * N.x,
-                                   local.x * T.y + local.y * B.y + local.z * N.y,
-                                   local.x * T.z + local.y * B.z + local.z * N.z};
+    Vector nxtDirection = PT_MAKE(Vector, local.x * T.x + local.y * B.x + local.z * N.x,
+                                  local.x * T.y + local.y * B.y + local.z * N.y,
+                                  local.x * T.z + local.y * B.z + local.z * N.z);
     return nxtDirection;
 }
 

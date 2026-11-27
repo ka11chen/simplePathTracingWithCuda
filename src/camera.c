@@ -1,4 +1,5 @@
 #include "camera.h"
+#include "scene_internal.h"
 #include <stdlib.h>
 
 /*
@@ -62,4 +63,19 @@ void destroyRegularCamera(Camera *camera) {
 
 ReversedRay getInitRay(Camera *camera, Real x, Real y, Real wavelength) {
     return camera->mapFunction(camera, x, y, wavelength);
+}
+
+bool ptGetRegularCameraParams(const Camera *cam, Real *width, Real *height, Real *startX,
+                              Real *endX, Real *startY, Real *endY, Real *z, Point *start) {
+    if (cam == NULL || cam->mapFunction != regularCameraMapFucntion) return false;
+    const RegularCameraData *data = (const RegularCameraData *)cam->data;
+    *width = data->width;
+    *height = data->height;
+    *startX = data->startX;
+    *endX = data->endX;
+    *startY = data->startY;
+    *endY = data->endY;
+    *z = data->z;
+    *start = data->start;
+    return true;
 }

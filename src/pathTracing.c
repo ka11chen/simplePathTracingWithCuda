@@ -1,4 +1,5 @@
 #include "../include/pathTracing.h"
+#include "gpu_render.h"
 #ifndef NO_SDL
 #if defined(__APPLE__)
 #include <SDL.h>
@@ -22,6 +23,7 @@ void renderToWindow(const char *windowTitle, Object **objects, LightSource **sou
                     Camera *camera, int width, int height, int threadCount) {
     initLightIntensity();
     initTexture();
+    gpuInitDevice();
 
     SDL_Init(SDL_INIT_VIDEO);
     VirtualScreen *vs = newScreen(width, height);
@@ -70,6 +72,7 @@ void renderToPictures(const char *outputPath, Object **objects, LightSource **so
                       Camera *camera, int width, int height, int threadCount) {
     initLightIntensity();
     initTexture();
+    gpuInitDevice();
 
     VirtualScreen *vs = newScreen(width, height);
 
@@ -110,6 +113,7 @@ void renderBenchmark(const char *outputPath, Object **objects, LightSource **sou
                      unsigned int seed, const char *xyzPath) {
     initLightIntensity();
     initTexture();
+    gpuInitDevice();
     VirtualScreen *vs = newScreen(width, height);
 
     struct timespec t0, t1;

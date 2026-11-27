@@ -1,4 +1,6 @@
 #include "object.h"
+#include "dynamicArray.h"
+#include "scene_internal.h"
 #include <stdlib.h>
 
 /*
@@ -85,3 +87,12 @@ Real getObjectInsideBaseColor(Object *self, Real lambda) {
 }
 
 Vector getNormalVector(Object *self, Point p) { return NormalVectorOfPoint(self->shape, p); }
+
+const Shape *ptGetObjectShape(const Object *obj) { return obj->shape; }
+
+const Interface *ptGetObjectInterface(const Object *obj) { return obj->interface; }
+
+int ptGetDynamicArraySize(const void *arr) {
+    if (arr == NULL) return 0;
+    return getSize(arr);
+}

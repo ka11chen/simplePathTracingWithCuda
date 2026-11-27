@@ -2,6 +2,10 @@
 #define TRANSFORM_H
 #include "base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // since users may want to do their own transform, we left a void *
 typedef Vector (*Transform)(Vector, void *);
 
@@ -28,5 +32,9 @@ Vector rotateAboutZAxis(Vector v, Real degree);
 
 // after doing transformation above than move it to the right place
 Vector moveBy(Vector v, Vector displacement);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

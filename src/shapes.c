@@ -2,6 +2,7 @@
 #include "base.h"
 #include "dynamicArray.h"
 #include "random.h"
+#include "scene_internal.h"
 #include <assert.h>
 #include <math.h>
 #include <stdlib.h>
@@ -435,4 +436,52 @@ Real PDFofPoint(Shape *self, Point point) { return self->PDFofPoint(self, point)
 // provide a uniform api to others to get normal vector of a point on surface from the shape
 Vector NormalVectorOfPoint(Shape *self, Point point) {
     return self->NormalVectorOfPoint(self, point);
+}
+
+PtShapeKind ptGetShapeKind(const Shape *shape) {
+    if (shape == NULL) return PT_SHAPE_UNKNOWN;
+    if (shape->detectCollide == detectTriangleCollide) return PT_SHAPE_TRIANGLE;
+    if (shape->detectCollide == detectSphereCollide) return PT_SHAPE_SPHERE;
+    if (shape->detectCollide == detectConvexPolygonCollide) return PT_SHAPE_CONVEX_POLYGON;
+    if (shape->detectCollide == detectPolygonCollide) return PT_SHAPE_POLYGON;
+    if (shape->detectCollide == detectGroupCollide) return PT_SHAPE_GROUP;
+    return PT_SHAPE_UNKNOWN;
+}
+
+void ptGetTriangleData(const Shape *shape, Point *p1, Point *p2, Point *p3, Vector *normal) {
+    const Triangle *tri = (const Triangle *)shape;
+    *p1 = tri->p1;
+    *p2 = tri->p2;
+    *p3 = tri->p3;
+    *normal = tri->normal;
+}
+
+void ptGetSphereData(const Shape *shape, Point *center, Real *radius) {
+    const Sphere *sph = (const Sphere *)shape;
+    *center = sph->center;
+    *radius = sph->radius;
+}
+
+void ptGetConvexPolygonData(const Shape *shape, const Point **vertexes, int *count, Vector *normal) {
+    const ConvexPolygon *cp = (const ConvexPolygon *)shape;
+    *vertexes = cp->vertexes;
+    *count = getSize(cp->vertexes);
+    *normal = cp->normal;
+}
+
+void ptGetPolygonData(const Shape *shape, const Real **vertexes2D, int *count, Point *p0,
+                      Vector *normal, Vector *axisI, Vector *axisJ) {
+    const Polygon *p = (const Polygon *)shape;
+    *vertexes2D = (const Real *)p->vertexes;
+    *count = getSize(p->vertexes);
+    *p0 = p->p0;
+    *normal = p->normal;
+    *axisI = p->i;
+    *axisJ = p->j;
+}
+
+void ptGetGroupData(const Shape *shape, Shape *const **elements, int *count) {
+    const Group *g = (const Group *)shape;
+    *elements = g->elements;
+    *count = getSize(g->elements);
 }

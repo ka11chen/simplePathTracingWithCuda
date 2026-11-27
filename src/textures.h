@@ -4,6 +4,10 @@
 #include "random.h"
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct Texture Texture;
 
 typedef struct Interface Interface;
@@ -78,5 +82,9 @@ Vector sampleHenyeyGreenstein(Vector input, MT19937 *mt, Real g);
 
 // Wrappers for textures
 Real getInterfaceRoughness(Interface *interface);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

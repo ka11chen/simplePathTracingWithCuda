@@ -1,288 +1,60 @@
 #include "multithreads.h"
-#include "random.h"
+#include "gpu_render.h"
 #include "render.h"
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdatomic.h>
 
 /*
  * @author seaofvoices
- * @brief To make full use of modern CPUs, this file divide the original task into parts on the
- * screen. Provides methods to manage the workers.
+ * @brief Manages GPU rendering sessions for progressive display and fixed-workload benchmarks.
  */
 
-typedef struct {
-    int leftBoundary, rightBoundary;
-} Range;
-
-typedef struct Node {
-    void *data;
-    struct Node *next;
-} Node;
-
-typedef struct {
-    Node *head;
-    Node *rear;
-    pthread_cond_t cond;
-    pthread_mutex_t mutex;
-    unsigned int length; // avoid a lot of confising situation
-} ThreadSafeQueue;
-
-static ThreadSafeQueue *newTSQueue() {
-    ThreadSafeQueue *tsq = malloc(sizeof(*tsq));
-    if (tsq == NULL) {
-        fprintf(stderr, "malloc thread safe queue failed\n");
-        exit(1);
-    }
-
-    tsq->head = tsq->rear = NULL;
-
-    // init mutex
-    if (pthread_mutex_init(&tsq->mutex, NULL) != 0) {
-        fprintf(stderr, "init mutex failed\n");
-        exit(1);
-    }
-
-    // init condition variable
-    if (pthread_cond_init(&tsq->cond, NULL) != 0) {
-        fprintf(stderr, "init condition variable failed\n");
-        exit(1);
-    }
-
-    tsq->length = 0;
-
-    return tsq;
-}
-
-// after using the TSQueue we destroy the queue
-// Note that this function will also free the data in the queue
-static void destroyTSQueue(ThreadSafeQueue *tsq) {
-    // destroy condition variable
-    pthread_cond_destroy(&tsq->cond);
-    // destroy mutex
-    pthread_mutex_destroy(&tsq->mutex);
-    // free all the element in the queue
-    for (int i = 0; i < tsq->length; i++) {
-        Node *temp = tsq->head;
-        tsq->head = tsq->head->next;
-        free(temp->data);
-        free(temp);
-    }
-    free(tsq);
-}
-
-static inline bool TSQIsEmpty(ThreadSafeQueue *tsq) { return tsq->length == 0; }
-
-// push the data into the queue
-static void TSQPush(ThreadSafeQueue *tsq, void *data) {
-    // lock the mutex to avoid race condition
-    pthread_mutex_lock(&tsq->mutex);
-
-    // add an element to the rear of the linked list
-    Node *temp = malloc(sizeof(*temp));
-    temp->data = data;
-    temp->next = NULL;
-
-    if (tsq->length == 0) {
-        // the queue is originally empty
-        tsq->head = temp;
-        tsq->rear = temp;
-    }
-    else {
-        tsq->rear->next = temp;
-        tsq->rear = temp;
-    }
-
-    ++tsq->length;
-
-    pthread_mutex_unlock(&tsq->mutex);
-
-    // after push an element into the queue, the queue is no longer empty
-    // so, we need to notify a thread to work
-    pthread_cond_signal(&tsq->cond);
-}
-
-// pop out data from queue and return the poped out data
-static void *TSQPop(ThreadSafeQueue *tsq) {
-    // lock the mutex to avoid race condition
-    pthread_mutex_lock(&tsq->mutex);
-
-    // wait until there is an element to be poped
-    while (TSQIsEmpty(tsq)) {
-        pthread_cond_wait(&tsq->cond, &tsq->mutex);
-    }
-
-    // now we should have locked up the mutex so do the following operations
-    // pop out the head node from the linked list
-    Node *temp = tsq->head;
-    tsq->head = tsq->head->next;
-    --tsq->length;
-    void *resultData = temp->data;
-    free(temp);
-    // data should be freed by the owner after poping out
-    pthread_mutex_unlock(&tsq->mutex);
-
-    return resultData;
-}
-
-typedef struct {
-    int id;
-    VirtualScreen *vs;
-    Object **objects;
-    LightSource **sources;
-    Camera *camera;
-    int workerCount;
-    int maxDepth;
-    int *exit;
-    ThreadSafeQueue *taskQueue;
-} WorkerPara;
-
 typedef struct Multithreads {
-    pthread_t *threadPool;
-    ThreadSafeQueue *taskQueue;
-    int threadCount;
-    int *exit;
+    pthread_t driverThread;
+    GpuRenderSession *session;
+    atomic_int exit;
 } Multithreads;
 
-static void *worker(void *para) {
-    WorkerPara *workerPara = (WorkerPara *)para;
-    int id = workerPara->id;
-    Object **objects = workerPara->objects;
-    LightSource **sources = workerPara->sources;
-    Camera *camera = workerPara->camera;
-    int maxDepth = workerPara->maxDepth;
-    VirtualScreen *vs = workerPara->vs;
-    ThreadSafeQueue *taskQueue = workerPara->taskQueue;
-
-    MT19937 *mt = initMT19937(id * 42 + time(NULL) + 19650218U);
-
-    while (*workerPara->exit == 0) {
-        // here we get the data from the task queue
-        // don't forget to recycle it later :)
-        Range *range = TSQPop(taskQueue);
-        int leftBoundary = range->leftBoundary;
-        int rightBoundary = range->rightBoundary;
-        for (int i = leftBoundary; i <= rightBoundary; i++) {
-            int x = getX(vs, i), y = getY(vs, i);
-            renderPixel(camera, vs, x, y, objects, sources, mt, maxDepth);
-        }
-
-        TSQPush(taskQueue, range);
+static void *gpuDriverWorker(void *para) {
+    Multithreads *mul = (Multithreads *)para;
+    static const int progressiveBatchSpp = 4;
+    while (atomic_load(&mul->exit) == 0) {
+        gpuRenderProgressiveBatch(mul->session, progressiveBatchSpp);
     }
-
-    destroyMT19937(mt);
-    free(para);
-
     return NULL;
 }
 
 Multithreads *initMultithreads(VirtualScreen *vs, int threadCount, Object **objects,
                                LightSource **sources, Camera *camera, int maxDepth) {
+    (void)threadCount;
     Multithreads *mul = malloc(sizeof(Multithreads));
-    pthread_t *threadPool = malloc(sizeof(pthread_t) * threadCount);
-
-    mul->exit = malloc(sizeof(int));
-    if (mul->exit == NULL) {
-        fprintf(stderr, "malloc result->exit failed\n");
+    if (mul == NULL) {
+        fprintf(stderr, "malloc Multithreads failed\n");
         exit(1);
     }
-    *mul->exit = 0;
-
-    int rangeLength = getScreenWidth(vs) * getScreenHeight(vs);
-    // here, we divide the screen into (blockCount) blocks
-    // and push them into task queue for workers to work
-    int blockCount = threadCount * 2;
-    ThreadSafeQueue *taskQueue = newTSQueue();
-    mul->taskQueue = taskQueue;
-
-    for (int id = 0; id < blockCount; id++) {
-        // given id of the block, we devide the range [0, width * height - 1] into (blockCount)
-        // pieces
-        // so that every block is allocated a piece
-        int leftBoundary = (rangeLength / blockCount) * id;
-        int rightBoundary = (rangeLength / blockCount) * (id + 1) - 1;
-        if (id == blockCount - 1) rightBoundary = rangeLength - 1;
-        Range *range = malloc(sizeof(*range));
-        *range = (Range){leftBoundary, rightBoundary};
-        TSQPush(taskQueue, range);
+    atomic_init(&mul->exit, 0);
+    mul->session = gpuCreateSession(vs, objects, sources, camera, maxDepth, 19650218U);
+    if (pthread_create(&mul->driverThread, NULL, gpuDriverWorker, mul) != 0) {
+        fprintf(stderr, "pthread_create gpuDriverWorker failed\n");
+        gpuDestroySession(mul->session);
+        free(mul);
+        exit(1);
     }
-
-    // create threads
-    for (int i = 0; i < threadCount; i++) {
-        WorkerPara *parai = malloc(sizeof(WorkerPara));
-        if (parai == NULL) {
-            *mul->exit = true;
-            for (int j = 0; j < i - 1; j++)
-                pthread_join(mul->threadPool[j], NULL);
-            fprintf(stderr, "malloc para%d failed\n", i);
-            exit(1);
-        }
-        // set parameters for every threads
-        parai->id = i;
-        parai->objects = objects;
-        parai->sources = sources;
-        parai->vs = vs;
-        parai->workerCount = threadCount;
-        parai->camera = camera;
-        parai->maxDepth = maxDepth;
-        parai->exit = mul->exit;
-        parai->taskQueue = taskQueue;
-        pthread_create(&threadPool[i], NULL, worker, parai);
-    }
-
-    mul->threadPool = threadPool;
-    mul->threadCount = threadCount;
     return mul;
 }
 
 void destroyMultithreads(Multithreads *mul) {
-    *mul->exit = 1;
-    for (int i = 0; i < mul->threadCount; i++)
-        pthread_join(mul->threadPool[i], NULL);
-    free(mul->threadPool);
-    free(mul->exit);
-    destroyTSQueue(mul->taskQueue);
+    if (mul == NULL) return;
+    atomic_store(&mul->exit, 1);
+    pthread_join(mul->driverThread, NULL);
+    gpuDestroySession(mul->session);
     free(mul);
-}
-
-/*
- * Benchmark mode: fixed workload, no progressive loop.
- * Every pixel is rendered exactly `spp` times. Work is split into one task per screen row and the
- * RNG of a row is seeded from (seed, row), so the output does not depend on the thread count.
- */
-typedef struct {
-    VirtualScreen *vs;
-    Object **objects;
-    LightSource **sources;
-    Camera *camera;
-    int maxDepth, spp;
-    uint32_t seed;
-    atomic_int *nextRow;
-} BenchPara;
-
-static void *benchWorker(void *para) {
-    BenchPara *p = para;
-    int width = getScreenWidth(p->vs), height = getScreenHeight(p->vs);
-    int row;
-    while ((row = atomic_fetch_add(p->nextRow, 1)) < height) {
-        MT19937 *mt = initMT19937(p->seed + 7919U * (uint32_t)row + 19650218U);
-        for (int x = 0; x < width; x++) {
-            int y = getY(p->vs, row * width + x);
-            for (int s = 0; s < p->spp; s++)
-                renderPixel(p->camera, p->vs, x, y, p->objects, p->sources, mt, p->maxDepth);
-        }
-        destroyMT19937(mt);
-    }
-    return NULL;
 }
 
 void runFixedWorkload(VirtualScreen *vs, int threadCount, Object **objects, LightSource **sources,
                       Camera *camera, int maxDepth, int spp, uint32_t seed) {
-    atomic_int nextRow = 0;
-    BenchPara para = {vs, objects, sources, camera, maxDepth, spp, seed, &nextRow};
-    pthread_t *pool = malloc(sizeof(pthread_t) * threadCount);
-    for (int i = 0; i < threadCount; i++) pthread_create(&pool[i], NULL, benchWorker, &para);
-    for (int i = 0; i < threadCount; i++) pthread_join(pool[i], NULL);
-    free(pool);
+    (void)threadCount;
+    gpuRunFixedWorkload(vs, objects, sources, camera, maxDepth, spp, seed);
 }

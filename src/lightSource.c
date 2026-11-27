@@ -1,4 +1,5 @@
 #include "lightSource.h"
+#include "scene_internal.h"
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -122,4 +123,16 @@ Real sunlightBase(Real wavelength) {
 
 Real whiteLightBase(Real wavelength) {
     return getBlackbodyIntensity(wavelength, 6500) / getBlackbodyIntensity(555, 6500);
+}
+
+PtLightKind ptGetLightKind(LightIntensity (*fn)(Real)) {
+    if (fn == tungstenLampBase) return PT_LIGHT_TUNGSTEN;
+    if (fn == sunlightBase) return PT_LIGHT_SUNLIGHT;
+    if (fn == whiteLightBase) return PT_LIGHT_WHITE;
+    return PT_LIGHT_CUSTOM;
+}
+
+const ColorXYZ *ptGetWavelengthToXYZTable(int *count) {
+    *count = 90;
+    return convertTable;
 }

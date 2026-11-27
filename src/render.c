@@ -3,6 +3,7 @@
 #include "lightSource.h"
 #include "object.h"
 #include "random.h"
+#include "scene_internal.h"
 #include "shapes.h"
 #include <assert.h>
 #include <limits.h>
@@ -877,12 +878,12 @@ static LightIntensity tracePath(ReversedRay initRay, Object **objects, LightSour
     Real intensity = 0;
     Real throughput = 1;
 
-    ReversedRay preRay;
+    ReversedRay preRay = {0};
     ReversedRay curRay = initRay;
-    Complex preN1;
-    Complex preN2;
+    Complex preN1 = {0};
+    Complex preN2 = {0};
     Object *preCollideObject = NULL;
-    Vector preL, preV, preN;
+    Vector preL = {0}, preV = {0}, preN = {0};
     // record specular or not in previous round
     bool isSpecularBounce = true; // direct light or specular light should not apply NEE
 
@@ -1029,3 +1030,9 @@ void renderPixel(Camera *camera, VirtualScreen *vs, int x, int y, Object **objec
     updateScreen(vs, x, y, colorResult);
     return;
 }
+
+ScreenColor *ptGetScreenColorBuffer(VirtualScreen *vs) { return vs->buffer; }
+
+ColorXYZ *ptGetScreenMeanBuffer(VirtualScreen *vs) { return vs->mean; }
+
+unsigned long long *ptGetScreenRenderCountBuffer(VirtualScreen *vs) { return vs->renderCount; }

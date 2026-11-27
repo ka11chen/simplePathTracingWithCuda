@@ -2,6 +2,10 @@
 #define CAMERA_H
 #include "base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct Camera Camera;
 
 Camera *newRegularCamera(int width, int height, Real startX, Real endX, Real startY, Real endY,
@@ -10,5 +14,9 @@ Camera *newRegularCamera(int width, int height, Real startX, Real endX, Real sta
 void destroyRegularCamera(Camera *camera);
 
 ReversedRay getInitRay(Camera *camera, Real x, Real y, Real wavelength);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -9,6 +9,10 @@
 #include "../src/render.h"
 #include "../src/textures.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef NO_SDL
 void renderToWindow(const char *windowTitle, Object **objects, LightSource **sources,
                          Camera *camera, int width, int height, int threadCount);
@@ -21,5 +25,9 @@ void renderToPictures(const char *outputPath, Object **objects, LightSource **so
 void renderBenchmark(const char *outputPath, Object **objects, LightSource **sources,
                      Camera *camera, int width, int height, int threadCount, int spp,
                      unsigned int seed, const char *xyzPath);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

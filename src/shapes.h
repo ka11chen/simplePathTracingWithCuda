@@ -4,6 +4,10 @@
 #include "base.h"
 #include "random.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     bool collide;        // if the ray collide the shape
     Real distance;       // the distance between the start of the ray and the collide point
@@ -41,5 +45,9 @@ Point randomPoint(Shape *shape, MT19937 *mt);
 Real PDFofPoint(Shape *self, Point point);
 
 Vector NormalVectorOfPoint(Shape *self, Point point);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -1,6 +1,7 @@
 #include "textures.h"
 #include "base.h"
 #include "random.h"
+#include "scene_internal.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -552,6 +553,98 @@ Interface *newInterface(Texture *in, Texture *out, Real roughness) {
 void destroyInterface(Interface *interface) {
     // users should manage the texture themselves since they might reuse the textures like air
     free(interface);
+}
+
+void ptGetInterfaceParts(const Interface *iface, const Texture **inTex, const Texture **outTex,
+                         Real *roughness) {
+    *inTex = iface->in;
+    *outTex = iface->out;
+    *roughness = iface->roughness;
+}
+
+uint32_t ptGetTextureTags(const Texture *tex) { return (uint32_t)tex->tags; }
+
+PtRefrKind ptGetTextureRefrKind(const Texture *tex) {
+    if (tex->refractiveIndex == getAirRefractivity) return PT_REFR_AIR;
+    if (tex->refractiveIndex == getPlasticRefractivity) return PT_REFR_PLASTIC;
+    if (tex->refractiveIndex == getAerogelRefractivity) return PT_REFR_AEROGEL;
+    if (tex->refractiveIndex == getMarbleRefractivity) return PT_REFR_MARBLE;
+    if (tex->refractiveIndex == getPinkMarbleRefractivity) return PT_REFR_PINK_MARBLE;
+    if (tex->refractiveIndex == getDiamondRefractivity) return PT_REFR_DIAMOND;
+    if (tex->refractiveIndex == getSapphireRefractivity) return PT_REFR_SAPPHIRE;
+    if (tex->refractiveIndex == getSilverRefractivity) return PT_REFR_SILVER;
+    if (tex->refractiveIndex == getGoldRefractivity) return PT_REFR_GOLD;
+    if (tex->refractiveIndex == getCopperRefractivity) return PT_REFR_COPPER;
+    if (tex->refractiveIndex == getIronRefractivity) return PT_REFR_IRON;
+    if (tex->refractiveIndex == getGlassRefractivity) return PT_REFR_GLASS;
+    return PT_REFR_CUSTOM;
+}
+
+Real ptGetTextureConcentration(const Texture *tex) {
+    if (isTextureFullyTransparent((Texture *)tex) && tex->data != NULL) {
+        return *(const Real *)tex->data;
+    }
+    return 0;
+}
+
+Complex ptEvalTextureRefractiveIndex(const Texture *tex, Real lambda) {
+    return tex->refractiveIndex((Texture *)tex, lambda);
+}
+
+PtBaseColorKind ptGetTextureBaseColorKind(const Texture *tex) {
+    if ((tex->tags & HALF_TRANSPARENT) != OPAQUE || (tex->tags & METALLIC)) {
+        return PT_BASE_BLACK;
+    }
+    Real (*fn)(Real) = (Real (*)(Real))tex->data;
+    if (fn == pureWhite) return PT_BASE_WHITE;
+    if (fn == pureBlack) return PT_BASE_BLACK;
+    if (fn == red) return PT_BASE_RED;
+    return PT_BASE_CUSTOM;
+}
+
+Real ptEvalTextureBaseColor(const Texture *tex, Real lambda) {
+    Real (*fn)(Real) = (Real (*)(Real))tex->data;
+    return fn ? fn(lambda) : 0;
+}
+
+PtSigmaSKind ptGetTextureSigmaSKind(const Texture *tex) {
+    if (!isTextureHalfTransparent((Texture *)tex)) return PT_SIGMA_CUSTOM;
+    const HalfTransparentTextureData *data = (const HalfTransparentTextureData *)tex->data;
+    if (data->sigmaS == getMarbleSigmaS) return PT_SIGMA_MARBLE;
+    if (data->sigmaS == getPinkMarbleSigmaS) return PT_SIGMA_PINK_MARBLE;
+    if (data->sigmaS == getAerogelSigmaS) return PT_SIGMA_AEROGEL;
+    return PT_SIGMA_CUSTOM;
+}
+
+Real ptEvalTextureSigmaS(const Texture *tex, Real lambda) {
+    const HalfTransparentTextureData *data = (const HalfTransparentTextureData *)tex->data;
+    return data->sigmaS(lambda);
+}
+
+PtPhaseKind ptGetTexturePhaseKind(const Texture *tex) {
+    if (!isTextureHalfTransparent((Texture *)tex)) return PT_PHASE_CUSTOM;
+    const HalfTransparentTextureData *data = (const HalfTransparentTextureData *)tex->data;
+    if (data->sampleNextDirection == sampleMarbleNextDirection) return PT_PHASE_HG_MARBLE;
+    if (data->sampleNextDirection == sampleRayleighScatteringNextDirection) return PT_PHASE_RAYLEIGH;
+    return PT_PHASE_CUSTOM;
+}
+
+void ptGetTextureStaticTables(const Complex **agEta, int *agCount, const Complex **auEta,
+                              int *auCount, const Complex **cuEta, int *cuCount,
+                              const Complex **feEta, int *feCount, const Complex **glassEta,
+                              int *glassCount, const Complex **sapphireEC, int *sapphireCount) {
+    *agEta = AgEta;
+    *agCount = AG_LINE_COUNT;
+    *auEta = AuEta;
+    *auCount = AU_LINE_COUNT;
+    *cuEta = CuEta;
+    *cuCount = CU_LINE_COUNT;
+    *feEta = FeEta;
+    *feCount = FE_LINE_COUNT;
+    *glassEta = GlassEta;
+    *glassCount = GLASS_LINE_COUNT;
+    *sapphireEC = EC;
+    *sapphireCount = SAPPHIRE_LINE_COUNT;
 }
 
 #undef AG_LINE_COUNT

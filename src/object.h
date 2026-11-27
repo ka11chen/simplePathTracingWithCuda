@@ -6,6 +6,10 @@
 #include "textures.h"
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct Object Object;
 
 Object *newObject(Shape *shape, Interface *interface);
@@ -45,5 +49,9 @@ bool isObjectOutsideMetallic(Object *self);
 Real getObjectInsideBaseColor(Object *self, Real lambda);
 
 Vector getNormalVector(Object *self, Point p);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

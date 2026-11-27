@@ -5,6 +5,10 @@
 #include "shapes.h"
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     Shape *shape;
     LightIntensity (*intensity)(Real wavelength);
@@ -30,11 +34,11 @@ ColorXYZ wavelengthToXYZ(Real wavelength);
 ScreenColor XYZtoRGB(ColorXYZ xyz);
 
 static inline ColorXYZ colorAdd(ColorXYZ a, ColorXYZ b) {
-    return (ColorXYZ){a.X + b.X, a.Y + b.Y, a.Z + b.Z};
+    return PT_MAKE(ColorXYZ, a.X + b.X, a.Y + b.Y, a.Z + b.Z);
 }
 
 static inline ColorXYZ colorComponent(Real c, ColorXYZ color) {
-    return (ColorXYZ){c * color.X, c * color.Y, c * color.Z};
+    return PT_MAKE(ColorXYZ, c * color.X, c * color.Y, c * color.Z);
 }
 
 CollideLightSourceResult collideLightSource(LightSource *source, ReversedRay *ray);
@@ -46,5 +50,9 @@ Real tungstenLampBase(Real wavelength);
 Real sunlightBase(Real wavelength);
 
 Real whiteLightBase(Real wavelength);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

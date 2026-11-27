@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include "base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     uint32_t *mt;
     uint32_t mti;
@@ -20,5 +24,9 @@ Real randomReal(MT19937 *mt);
 
 // randomly generate a integer in [0, n - 1] 
 uint32_t randomInt(MT19937 *mt, uint32_t n);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

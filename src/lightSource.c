@@ -11,13 +11,25 @@
  */
 
 LightSource newLightSource(Shape *shape, LightIntensity (*intensity)(Real)) {
-    return (LightSource){shape, intensity};
+    return (LightSource){shape, intensity, 0, 0, 0};
+}
+
+LightSource newBlackbodyLightSource(Shape *shape, Real T, Real scale) {
+    return (LightSource){shape, NULL, T, getBlackbodyIntensity(555, T), scale};
+}
+
+LightIntensity getLightIntensity(const LightSource *source, Real wavelength) {
+    if (source->intensity != NULL) return source->intensity(wavelength);
+    LightIntensity I = getBlackbodyIntensity(wavelength, source->blackbodyT) / source->blackbodyNorm;
+    // skip the multiplication for the common scale = 1 so the result matches the original
+    // hand-written spectra (e.g. tungstenLampBase) exactly
+    return source->blackbodyScale == 1 ? I : I * source->blackbodyScale;
 }
 
 CollideLightSourceResult collideLightSource(LightSource *source, ReversedRay *ray) {
     CollideResult result = detectCollide(source->shape, ray);
     return (CollideLightSourceResult){result.collide, result.distance, result.normalVector,
-                                      source->intensity(ray->wavelength)};
+                                      getLightIntensity(source, ray->wavelength)};
 }
 
 static const int startWavelength = 390;

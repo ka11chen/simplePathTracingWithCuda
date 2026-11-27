@@ -8,12 +8,22 @@ LightIntensity coldLightBase(Real lambda) {
     return getBlackbodyIntensity(lambda, 9500) / 158005180313225.187500;
 }
 
+static void usage(const char *program) {
+    fprintf(stderr,
+            "usage: %s [--scene FILE] [--width N] [--height N]\n"
+            "       %*s [--bench [--spp N] [--threads N] [--seed N] [--out FILE] [--out-xyz FILE]]\n"
+            "without --scene the built-in example scene is rendered\n",
+            program, (int)strlen(program), "");
+}
+
 int main(int argc, char **argv) {
-    // benchmark options:  --bench [--spp N] [--threads N] [--seed N] [--out FILE] [--out-xyz FILE]
+    // options:  [--scene FILE] [--width N] [--height N]
+    //           [--bench [--spp N] [--threads N] [--seed N] [--out FILE] [--out-xyz FILE]]
     bool bench = false;
     int spp = 64, benchThreads = 1;
     unsigned int seed = 42;
-    const char *benchOut = NULL, *benchXYZ = NULL;
+    const char *benchOut = NULL, *benchXYZ = NULL, *scenePath = NULL;
+    int overrideWidth = 0, overrideHeight = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--bench")) bench = true;
         else if (!strcmp(argv[i], "--spp") && i + 1 < argc) spp = atoi(argv[++i]);
@@ -21,6 +31,43 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--seed") && i + 1 < argc) seed = strtoul(argv[++i], NULL, 10);
         else if (!strcmp(argv[i], "--out") && i + 1 < argc) benchOut = argv[++i];
         else if (!strcmp(argv[i], "--out-xyz") && i + 1 < argc) benchXYZ = argv[++i];
+        else if (!strcmp(argv[i], "--scene") && i + 1 < argc) scenePath = argv[++i];
+        else if (!strcmp(argv[i], "--width") && i + 1 < argc) overrideWidth = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--height") && i + 1 < argc) overrideHeight = atoi(argv[++i]);
+        else {
+            fprintf(stderr, "unknown or incomplete option '%s'\n", argv[i]);
+            usage(argv[0]);
+            return 1;
+        }
+    }
+    if (spp <= 0 || benchThreads <= 0) {
+        fprintf(stderr, "--spp and --threads must be positive\n");
+        return 1;
+    }
+
+    if (scenePath != NULL) {
+        if (overrideWidth < 0 || overrideHeight < 0) {
+            fprintf(stderr, "--width and --height must be positive\n");
+            return 1;
+        }
+        Scene *scene = loadScene(scenePath, overrideWidth, overrideHeight);
+        if (bench) {
+            renderBenchmark(benchOut, scene->objects, scene->sources, scene->camera, scene->width,
+                            scene->height, benchThreads, spp, seed, benchXYZ);
+        } else {
+#ifndef NO_SDL
+            renderToWindow(scenePath, scene->objects, scene->sources, scene->camera, scene->width,
+                           scene->height, 30);
+#else
+            fprintf(stderr, "built without SDL: use --bench\n");
+#endif
+        }
+        destroyScene(scene);
+        return 0;
+    }
+    if (overrideWidth != 0 || overrideHeight != 0) {
+        fprintf(stderr, "--width and --height only work together with --scene\n");
+        return 1;
     }
 
     static const Real width = 720;

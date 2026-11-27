@@ -23,10 +23,9 @@
 
 如果你和我一樣是 mac 使用者（系統：macOS Sequoia 15.7.9），請事先 `brew install sdl2-compat`，並確保 `sdl2-config` 可以正常運作。
 
-如果你是 debian 系，例如 Ubuntu，的 linux user，請 `sudo apt install libsdl2-compat`，並確保 sdl2-config 可以正常運作。
-其他 linux 發行版只要能裝上 sdl2 並且讓 `sdl2-config` 能夠正常運作應該就不會有什麼問題。
+如果你是 linux 使用者，請下載sdl2套件(`libsdl2-compat` 或 `libsdl2-2.0-0` 等等)，並確保 `sdl2-config` 可以正常運作。
 
-對於 Windows 使用者，我很抱歉，但 Windows 不遵守 POSIX 規範，因此多線程的部分完全無法通用，而且 make 工具和腳本都不能用。
+對於 Windows 使用者，請使用 WSL2。
 
 如果你想要 renderToPictures，我有寫一個 toImg.py 幫助你把輸出檔案轉換成一個 .png 檔案。環境需求在 [requirements.txt](requirements.txt) 裡面。
 
@@ -111,3 +110,6 @@ void renderToPictures(
     int threadCount)
 ```
 `outputPath` 是指輸出檔案的名稱，剩下參數同 `renderToWindow`。
+
+### Benchmark
+See [BENCHMARK](BENCHMARK.md)

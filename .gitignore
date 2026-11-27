@@ -13,3 +13,6 @@ upload.sh
 processImg.sh
 autogit.sh
 Makefile
+Claude.md
+out*
+sppSweep

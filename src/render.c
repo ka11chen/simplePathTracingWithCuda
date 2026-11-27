@@ -801,7 +801,7 @@ static inline LightIntensity sampleNEE(Complex n1, Complex n2,
     // randomly choose a light source in sources
     uint32_t randomIndex = randomInt(mt, sourcesCount);
     LightSource *src = sources[randomIndex];
-    LightIntensity intensity = src->intensity(ray.wavelength);
+    LightIntensity intensity = getLightIntensity(src, ray.wavelength);
 
     Point point = randomPoint(src->shape, mt);
     Real randomPointPDF = PDFofPoint(src->shape, point);
@@ -915,7 +915,7 @@ static LightIntensity tracePath(ReversedRay initRay, Object **objects, LightSour
             firstCollideSourceResult.distance <= firstCollideObjectResult.distance &&
             firstCollideSource != NULL;
         if (collideLightFirst) {
-            LightIntensity sourceIntensity = firstCollideSource->intensity(curRay.wavelength);
+            LightIntensity sourceIntensity = getLightIntensity(firstCollideSource, curRay.wavelength);
 
             if (isSpecularBounce) {
                 intensity += throughput * sourceIntensity;

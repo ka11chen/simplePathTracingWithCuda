@@ -107,7 +107,7 @@ static CollideResult detectTriangleCollide(Shape *self, ReversedRay *ray) {
     Real deltaV = A.x * W.y * (-D.z) + A.z * W.x * (-D.y) + A.y * W.z * (-D.x) -
                   A.z * W.y * (-D.x) - A.x * W.z * (-D.y) - A.y * W.x * (-D.z);
     Real v = deltaV / delta;
-    if (v < 0 || u > 1 || u + v > 1) return result;
+    if (v < 0 || v > 1 || u + v > 1) return result;
 
     Real deltaT = A.x * B.y * W.z + A.z * B.x * W.y + A.y * B.z * W.x - A.z * B.y * W.x -
                   A.x * B.z * W.y - A.y * B.x * W.z;
@@ -276,6 +276,20 @@ static Vector normalVectorOfPolygon(Point *vertexes) {
         N = vecCross(e1, e2);
         if (lengthOf(N) > 1e-5) break;
     }
+
+    // For a concave polygon the three vertexes above may sit on a reflex corner, which flips N.
+    // Newell's method gives the area-weighted normal, whose direction is always the one implied
+    // by the vertex order (counter-clockwise = front). Use it only to fix the sign of N.
+    Vector newell = {0, 0, 0};
+    for (int i = 0; i < vertexesCount; i++) {
+        Point a = vertexes[i];
+        Point b = vertexes[(i + 1) % vertexesCount];
+        newell.x += (a.y - b.y) * (a.z + b.z);
+        newell.y += (a.z - b.z) * (a.x + b.x);
+        newell.z += (a.x - b.x) * (a.y + b.y);
+    }
+    if (vecDot(N, newell) < 0) N = vecNegative(N);
+
     return unitVector(N);
 }
 

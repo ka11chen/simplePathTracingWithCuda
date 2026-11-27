@@ -11,13 +11,25 @@
  */
 
 LightSource newLightSource(Shape *shape, LightIntensity (*intensity)(Real)) {
-    return (LightSource){shape, intensity};
+    return (LightSource){shape, intensity, 0, 0, 0};
+}
+
+LightSource newBlackbodyLightSource(Shape *shape, Real T, Real scale) {
+    return (LightSource){shape, NULL, T, getBlackbodyIntensity(555, T), scale};
+}
+
+LightIntensity getLightIntensity(const LightSource *source, Real wavelength) {
+    if (source->intensity != NULL) return source->intensity(wavelength);
+    LightIntensity I = getBlackbodyIntensity(wavelength, source->blackbodyT) / source->blackbodyNorm;
+    // skip the multiplication for the common scale = 1 so the result matches the original
+    // hand-written spectra (e.g. tungstenLampBase) exactly
+    return source->blackbodyScale == 1 ? I : I * source->blackbodyScale;
 }
 
 CollideLightSourceResult collideLightSource(LightSource *source, ReversedRay *ray) {
     CollideResult result = detectCollide(source->shape, ray);
     return (CollideLightSourceResult){result.collide, result.distance, result.normalVector,
-                                      source->intensity(ray->wavelength)};
+                                      getLightIntensity(source, ray->wavelength)};
 }
 
 static const int startWavelength = 390;
@@ -36,9 +48,12 @@ void initLightIntensity() {
 
     for (int i = 0; i < 89; i++) {
         int lambda;
-        fscanf(csv, "%d,", &lambda);
-        fscanf(csv, REAL_FMT "," REAL_FMT "," REAL_FMT, &convertTable[i].X, &convertTable[i].Y,
-               &convertTable[i].Z);
+        if (fscanf(csv, "%d,", &lambda) != 1 ||
+            fscanf(csv, REAL_FMT "," REAL_FMT "," REAL_FMT, &convertTable[i].X, &convertTable[i].Y,
+                   &convertTable[i].Z) != 3) {
+            fprintf(stderr, "Failed to read src/static/wavelengthToXYZ.csv: malformed line\n");
+            exit(1);
+        }
     }
     fclose(csv);
 }

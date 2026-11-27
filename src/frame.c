@@ -57,8 +57,10 @@ Frame *newFrame(const char *path) {
                     lineEnd = true;
                     break;
                 }
-                int vertexNumber, _;
-                sscanf(token, "%d//%d", &vertexNumber, &_);
+                // "a", "a/b", "a//c" and "a/b/c" all start with the vertex number a; tokens that
+                // are not numbers (e.g. a trailing newline after a space) are skipped
+                int vertexNumber;
+                if (sscanf(token, "%d", &vertexNumber) != 1) continue;
                 pushBack(&f,
                          vertexNumber - 1, // in obj files they are 1-based but we need 0-based here
                          int);
@@ -72,8 +74,33 @@ Frame *newFrame(const char *path) {
     return frame;
 }
 
+const char *frameError(Frame *frame) {
+    static char message[160];
+    int vertexCount = getSize(frame->vertexes);
+    int faceCount = getSize(frame->faces);
+    if (faceCount == 0) return "the file has no faces";
+    for (int i = 0; i < faceCount; i++) {
+        int n = getSize(frame->faces[i]);
+        if (n < 3) {
+            snprintf(message, sizeof(message), "face %d has %d vertexes, needs at least 3", i + 1, n);
+            return message;
+        }
+        for (int j = 0; j < n; j++) {
+            int v = frame->faces[i][j];
+            if (v < 0 || v >= vertexCount) {
+                snprintf(message, sizeof(message),
+                         "face %d uses vertex %d, but the file has %d vertexes", i + 1, v + 1,
+                         vertexCount);
+                return message;
+            }
+        }
+    }
+    return NULL;
+}
+
 void destroyFrame(Frame *frame) {
     freeDynamicArray(frame->vertexes);
+    for (int i = 0; i < getSize(frame->faces); i++) freeDynamicArray(frame->faces[i]);
     freeDynamicArray(frame->faces);
     free(frame);
 }
@@ -100,5 +127,7 @@ Shape *newGroupFromFrame(Frame *m, Transform t, void *para) {
         }
         freeDynamicArray(vertexes);
     }
-    return newGroup(shapes);
+    Shape *group = newGroup(shapes);
+    freeDynamicArray(shapes); // newGroup keeps its own copy of the array
+    return group;
 }

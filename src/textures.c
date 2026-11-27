@@ -162,29 +162,35 @@ static const Real GLASS_LAMBDA_STEP = 10;
 
 static const Real startLambda = 390;
 
-static void readFile(const char *filePathN, const char *filePathK, Complex eta[], int lineCount) {
+static void dataFileError(const char *path, const char *reason) {
+    fprintf(stderr, "Failed to read %s: %s (run the program from the project root)\n", path,
+            reason);
+    exit(1);
+}
+
+static FILE *openDataFile(const char *path, int expectedLines) {
+    FILE *f = fopen(path, "r");
+    if (f == NULL) dataFileError(path, "cannot open file");
     int lineCountFromFile = 0;
+    if (fscanf(f, "%d", &lineCountFromFile) != 1) dataFileError(path, "missing line count");
+    if (lineCountFromFile < expectedLines) dataFileError(path, "fewer lines than expected");
+    return f;
+}
 
-    FILE *fN = fopen(filePathN, "r");
-    if (fN == NULL) {
-        exit(1);
-    }
-
-    fscanf(fN, "%d", &lineCountFromFile);
+static void readFile(const char *filePathN, const char *filePathK, Complex eta[], int lineCount) {
+    FILE *fN = openDataFile(filePathN, lineCount);
     for (int i = 0; i < lineCount; i++) {
         Real lambda = 0;
-        fscanf(fN, REAL_FMT "," REAL_FMT, &lambda, &eta[i].R);
+        if (fscanf(fN, REAL_FMT "," REAL_FMT, &lambda, &eta[i].R) != 2)
+            dataFileError(filePathN, "malformed line");
     }
     fclose(fN);
 
-    FILE *fK = fopen(filePathK, "r");
-    if (fK == NULL) {
-        exit(1);
-    }
-    fscanf(fK, "%d", &lineCount);
+    FILE *fK = openDataFile(filePathK, lineCount);
     for (int i = 0; i < lineCount; i++) {
         Real lambda = 0;
-        fscanf(fK, REAL_FMT "," REAL_FMT, &lambda, &eta[i].I);
+        if (fscanf(fK, REAL_FMT "," REAL_FMT, &lambda, &eta[i].I) != 2)
+            dataFileError(filePathK, "malformed line");
     }
     fclose(fK);
     return;
@@ -199,14 +205,12 @@ static const Real SAPPHIRE_STEP = 10;
 
 // since no direct k can be directly used by sapphire, we need a different way to read the epsilon
 static void readSapphireEpsilon() {
-    int lineCountFromFile = 0;
-    FILE *f = fopen(SAPPHIRE_PATH, "r");
-
-    fscanf(f, "%d", &lineCountFromFile);
+    FILE *f = openDataFile(SAPPHIRE_PATH, SAPPHIRE_LINE_COUNT);
 
     for (int i = 0; i < SAPPHIRE_LINE_COUNT; i++) {
         Real lambda;
-        fscanf(f, REAL_FMT "," REAL_FMT "," REAL_FMT, &lambda, &EC[i].R, &EC[i].I);
+        if (fscanf(f, REAL_FMT "," REAL_FMT "," REAL_FMT, &lambda, &EC[i].R, &EC[i].I) != 3)
+            dataFileError(SAPPHIRE_PATH, "malformed line");
     }
 
     fclose(f);
@@ -227,8 +231,6 @@ Real pureWhite(Real _) { return 0.8; }
 Real pureBlack(Real _) { return 0; }
 
 Real red(Real lambda) { return 0.05 + 0.75 / (1 + rexp(-0.06 * (lambda - 650))); }
-
-Real green(Real lambda) { return 0.05 + 0.75 / (1 + rexp(-0.06 * (lambda - 650))); }
 
 Complex getPlasticRefractivity(Texture *__, Real _) { return (Complex){1.5, 0.0}; }
 

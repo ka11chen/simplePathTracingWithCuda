@@ -7,6 +7,7 @@
 #include "../src/multithreads.h"
 #include "../src/object.h"
 #include "../src/render.h"
+#include "../src/scene.h"
 #include "../src/textures.h"
 
 #ifndef NO_SDL

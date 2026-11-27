@@ -111,5 +111,7 @@ void renderToPictures(
 ```
 `outputPath` 是指輸出檔案的名稱，剩下參數同 `renderToWindow`。
 
-### Benchmark
-See [BENCHMARK](BENCHMARK.md)
+### 場景與效能量測
+
+- [場景檔格式](docs/SCENE_FORMAT.md)
+- [效能量測指南](docs/BENCHMARK.md)

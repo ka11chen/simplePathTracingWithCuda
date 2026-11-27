@@ -1,0 +1,41 @@
+pathtracer-scene 1
+# The built-in scene of example.c as a scene file. Rendering this file gives a bit-identical
+# image to running without --scene, so it is the reference for the format.
+# Some numbers look odd (172.79999999999998): they are the exact values example.c computes
+# (height * 0.36), written so they read back as the same double.
+
+resolution 720 480
+camera 144 576 172.79999999999998 460.79999999999995 -160 720
+
+material air      air
+material white    whitePlastic
+material pink     pinkMarble
+material gem      diamond
+material sapph    sapphire concentration=5e-3
+material gold     gold
+material glass    glass
+material aerogel  aerogel
+
+interface groundI   white   air roughness=1
+interface marbleI   pink    air roughness=0
+interface diamondI  gem     air roughness=0
+interface sapphI    sapph   air roughness=0
+interface glassI    glass   air roughness=0.5
+interface aerogelI  aerogel air roughness=1
+interface goldI     gold    air roughness=0.3
+
+# objects (same order as example.c)
+convex  groundI   1440 160 240    1440 160 -480   -720 160 -480   -720 160 240    # floor
+convex  groundI   1440 160 -480   1440 720 -480   -720 720 -480   -720 160 -480   # back wall
+sphere  marbleI   180 240 -336  72
+mesh    diamondI  src/static/diamond.obj  scale=72                 rotate=60,0,0    at=360,240,-336
+mesh    sapphI    src/static/gem.obj      scale=72                 rotate=60,0,0    at=540,240,-336
+mesh    glassI    src/static/cube.obj     scale=46.800000000000004 rotate=45,45,45  at=540,405.6,-336
+mesh    aerogelI  src/static/cube.obj     scale=54                                  at=180,405.6,-336
+mesh    goldI     src/static/apple.obj    scale=360                                 at=360,405.6,-336
+
+# lights (same order as example.c)
+light   0   480 -192  72   blackbody=2800   # tungsten lamp
+light   360 240 -462  18   blackbody=5500   # sunlight
+light   720 480 -192  72   blackbody=9500   # cold light
+light   0   480 0     180  blackbody=5500   # sunlight, large

@@ -183,6 +183,8 @@ static FILE *openDataFile(const char *path, int *lineCount) {
 }
 
 static void readFile(RefIndex *src) {
+    if (src->eta != NULL) return;
+
     int lineCount;
     FILE *fN = openDataFile(src->pathN, &lineCount);
     src->n = lineCount;
@@ -224,6 +226,8 @@ static const Real SAPPHIRE_STEP = 10;
 
 // since no direct k can be directly used by sapphire, we need a different way to read the epsilon
 static void readSapphireEpsilon() {
+    if (EC != NULL) return;
+
     int lineCount = 0;
     FILE *f = openDataFile(SAPPHIRE_PATH, &lineCount);
     SAPPHIRE_LINE_COUNT = lineCount;
